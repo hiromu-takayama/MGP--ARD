@@ -1,6 +1,5 @@
 function [model] = MGP_BCPF_MP(Y, varargin)
 % Bayesian CP Factorization using Gaussian Mixture Priors for Image Completion
-% Author : Qibin Zhao  2014
 %
 % -----------------------------------------------------------------------
 %  [model] = BCPF_MP(Y, 'PARAM1', val1, 'PARAM2', val2, ...)
