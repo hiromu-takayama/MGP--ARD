@@ -1,13 +1,3 @@
-
-% A demo of Bayesian CP factorization for image completion
-% Written by Qibin Zhao 2014 RIKEN BSI
-%
-% In this demo, we provide two algorithms including BCPF_IC and BCPF_MP.
-% BCPF_IC is a Bayesian CP for image completion; BCPF_MP is a Bayesian CP
-% using mixture priors, which is particularly useful for natural image
-% completion. For algorithm settings, please refer to the detailed help by 
-% >> help BCPF_MP
-
 % The experimental data can be tested with
 % 1) Different image files
 % 2) Observation rate (1-missing rate)
