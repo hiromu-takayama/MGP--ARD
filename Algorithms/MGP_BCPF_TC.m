@@ -1,6 +1,5 @@
 function [model] = MGP_BCPF_TC(Y, a_del0,varargin)
 % Bayesian CP Factorization using Gaussian Mixture Priors for Image Completion
-% Author : Qibin Zhao  2014
 %
 % -----------------------------------------------------------------------
 %  [model] = BCPF_MP(Y, 'PARAM1', val1, 'PARAM2', val2, ...)
@@ -166,7 +165,7 @@ gammas=a_gamma0./(tau_para*tau);
 
 %tau_para=1;
 
-%1e-6 (I‚ª¬‚³‚¢ê‡C1e-3‚Æ‚©‚É”’l‚ğ‚ ‚°‚é)
+%1e-6 (IãŒå°ã•ã„å ´åˆï¼Œ1e-3ã¨ã‹ã«æ•°å€¤ã‚’ã‚ã’ã‚‹)
 
 
 Fit =0;
