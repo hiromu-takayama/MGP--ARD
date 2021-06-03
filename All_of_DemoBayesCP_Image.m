@@ -1,3 +1,5 @@
+% Written by Hiromu Takayama
+
 % The experimental data can be tested with
 % 1) Different image files
 % 2) Observation rate (1-missing rate)
