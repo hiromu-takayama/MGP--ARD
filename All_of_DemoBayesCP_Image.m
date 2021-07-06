@@ -1,4 +1,12 @@
+
+% A demo of Bayesian CP factorization for image completion
 % Written by Hiromu Takayama
+%
+% In this demo, we provide two algorithms including BCPF_IC and BCPF_MP.
+% BCPF_IC is a Bayesian CP for image completion; BCPF_MP is a Bayesian CP
+% using mixture priors, which is particularly useful for natural image
+% completion. For algorithm settings, please refer to the detailed help by 
+% >> help BCPF_MP
 
 % The experimental data can be tested with
 % 1) Different image files
@@ -64,6 +72,73 @@ for name=image_list
     else
         nd=1;      % natural images
     end
+    
+    %{
+
+    %% MGP-t for natural images
+    tStart = tic;
+    params.R = 50;
+    params.a = 2;
+    params.binary = 0;
+    params.tau_eps = 1;
+    params.normalize = 1;
+    params.maxiters = 100;
+    params.burnin = 80;
+    [data_train data_test subs_train subs_test] = generator_data(X,Y);
+    [U lambda prob_avg recover] = mu_mgpcp_gibbs_cp_t(double(data_train),subs_train,double(data_test),subs_test,params);
+    X_FBCPS = double(recover);
+
+    RSElist(1,1) = perfscore(X_FBCPS, X);
+    RSElist(1,2) = perfscore(X_FBCPS(O==1), X(O==1));
+    RSElist(1,3) = perfscore(X_FBCPS(O==0), X(O==0));
+
+    X_FBCPS(O==1) = X(O==1);
+    PSNRlist(1) = PSNR_RGB(X_FBCPS,X);
+    SSIMlist(1) = ssim_index(rgb2gray(uint8(X_FBCPS)),rgb2gray(uint8(X)));
+    RankEst(1) = params.R;
+    TimeCost(1) = toc(tStart);
+    figure; imshow(uint8(X_FBCPS)); title('FBCP-MP-t','FontWeight','bold'); drawnow;
+
+
+    %% MGP-a for natural images
+    tStart = tic;
+    params.R = 1;
+    [U lambda prob_avg recover R] = mu_mgpcp_gibbs_cp_a(double(data_train),subs_train,double(data_test),subs_test,params);
+    X_FBCPS = double(recover);
+
+    RSElist(2,1) = perfscore(X_FBCPS, X);
+    RSElist(2,2) = perfscore(X_FBCPS(O==1), X(O==1));
+    RSElist(2,3) = perfscore(X_FBCPS(O==0), X(O==0));
+
+    X_FBCPS(O==1) = X(O==1);
+    PSNRlist(2) = PSNR_RGB(X_FBCPS,X);
+    SSIMlist(2) = ssim_index(rgb2gray(uint8(X_FBCPS)),rgb2gray(uint8(X)));
+    RankEst(2) = R;
+    TimeCost(2) = toc(tStart);
+    figure; imshow(uint8(X_FBCPS)); title('FBCP-MP-a','FontWeight','bold'); drawnow;
+
+    %}
+    
+    %% ARD-BCPF-MP (mixture priors) for natural images
+    tStart = tic;
+    fprintf('------Bayesian CP with Mixture Priors for Image Completion---------- \n');
+    [model] = BCPF_MP(Y, 'obs', O, 'init', 'ml', 'maxRank', 100, 'maxiters', 30, ...
+        'tol', 1e-4, 'dimRed', 1, 'verbose', 2, 'nd', nd);
+    X_FBCPS = double(model.X);
+
+    RSElist(3,1) = perfscore(X_FBCPS, X);
+    RSElist(3,2) = perfscore(X_FBCPS(O==1), X(O==1));
+    RSElist(3,3) = perfscore(X_FBCPS(O==0), X(O==0));
+
+    X_FBCPS(O==1) = X(O==1);
+    PSNRlist(3) = PSNR_RGB(X_FBCPS,X);
+    SSIMlist(3) = ssim_index(rgb2gray(uint8(X_FBCPS)),rgb2gray(uint8(X)));
+    RankEst(3) = model.TrueRank;
+    TimeCost(3) = toc(tStart);
+    pause(0.1)
+    figure(h_2);
+    subplot(2,8,0+count); imshow(uint8(X_FBCPS)); title('ARD','FontWeight','bold'); drawnow;
+
     
     %% MGP-ARD-BCPF-MP (mixture priors) for natural images
     tStart = tic;
