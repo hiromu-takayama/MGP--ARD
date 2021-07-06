@@ -1,202 +1,183 @@
 % A demo of Bayesian CP Factorization on synthetic data
-% Written by Hiromu Takayama
+% Written by  Qibin Zhao 2013 RIKEN BSI
+%
+% In this demo, we provide two Bayesian CP Factorization algorithms: one for
+% incomplete tensor and tensor completion ("BCPF_TC.m") and the other one for
+% complete tensor, which is a more efficient implementation when tensor is 
+% fully observed ("BCPF.m").  
+% The parameter settings are optional, please refer to the help by command 
+% >> help BCPF_TC  
+% Two important settings are initialization method and initilization of maximum rank.
+% 
+% This demo is used for evaluation of CP Rank determination and predictive
+% perofrmance under varying conditions including Tensor size, True rank, 
+% Signal type, Observation ratio, and Noise SNRs.   
 
+% After the model learning, the results can be shown by
+% 1. Visualization of true latent factors and the estimated factors
+% 2. Visualization of observed tensor Y,  the estimated low-CP-rank tensor X
 
-total_plot=50;
+close all;
+randn('state',1); rand('state',1); %#ok<RAND>
+%% Generate a low-rank tensor
+DIM = [256,256,3];     % Dimensions of data
+R = 40;                % True CP rank
+DataType = 2;         % 1: Random factors   2: The deterministic factors (sin, cos, square)
 
-plot_list=cell(total_plot,2);
-plot_list_An=cell(total_plot,2);
-plot_list_tau=cell(total_plot,2);
-RankEst = zeros(total_plot,4);
-RSE_list_list = cell(total_plot,1);
-
-rng('shuffle','philox')
-s = rng;
-
-obs_rate_list=[15];
-
-rate_N=length(obs_rate_list);
-rate_iter=1;
-
-total_list=cell(rate_N,1);
-total_list_ave=cell(rate_N,1);
-
-a_del0_list=[0.8];
-
-for a_del0=a_del0_list
-
-    for obs_rate=obs_rate_list
-
-        for iter=1:total_plot
-
-            close all;
-            %randn('state',1); rand('state',1); %#ok<RAND>
-
-            %% Generate a low-rank tensor
-            DIM = [30,30,30];     % Dimensions of data
-            R = obs_rate;          % True CP rank
-            DataType = 2;         % 1: Random factors   2: The deterministic factors (sin, cos, square)
-
-            Z = cell(length(DIM),1);   
-            if DataType ==1
-                for m=1:length(DIM)
-                      Z{m} =  gaussSample(zeros(R,1), eye(R), DIM(m));  
-                end
-            end
-            if DataType == 2
-                for m=1:length(DIM)
-                    temp = linspace(0, m*2*pi, DIM(m));
-                    part1 = [sin(temp); cos(temp); square(linspace(0, 16*pi, DIM(m)))]';
-                    part2 = gaussSample(zeros(DIM(m),1), eye(DIM(m)), R-size(part1,2))';
-                    Z{m} = [part1 part2];
-                    Z{m} = Z{m}(:,1:R);
-                    Z{m} = zscore(Z{m});
-                end
-            end
-
-            figure;
-
-            answer=0;
-            for n=1:length(DIM)
-                subplot(length(DIM),1,n); heatmap(Z{n},'GridVisible','off');
-                answer = answer + diag(Z{n}'*Z{n});
-            end
-
-            % Generate tensor by factor matrices
-            X = double(ktensor_next(Z,DIM));
-
-            %% Random missing values
-            ObsRatio = 0.5;            % Observation rate: [0 ~ 1]
-            Omega = randperm(prod(DIM)); 
-            Omega = Omega(1:round(ObsRatio*prod(DIM)));
-            O = zeros(DIM); 
-            O(Omega) = 1;
-
-            %% Add noise
-            SNR = 20;                     % Noise levels
-            sigma2 = var(X(:))*(1/(10^(SNR/10)));
-            GN = sqrt(sigma2)*randn(DIM);
-
-            %% Generate observation tensor Y
-            Y = X + GN;
-            Y = O.*Y;
-
-            %% Run BayesCP
-            fprintf('------Bayesian CP Factorization---------- \n');
-
-            % Initialization
-            TimeCost = zeros(4,1);
-            RSElist = zeros(4,3);
-            RMSElist = zeros(4,1);
-            RRSElist = zeros(4,1);
-            nd=1;
-
-            %% MGP-ARD-BCPF-TC
-            tStart = tic;
-            fprintf('------Bayesian CP with Mixture Priors for Image Completion---------- \n');
-            [model] = MGP_BCPF_TC(Y, a_del0, 'obs', O, 'init', 'ml', 'maxRank', 2*R, 'dimRed', 1, 'tol', 1e-4, 'maxiters', 100, 'verbose', 2);
-            %1e-4
-
-            %max([DIM 2*R])
-            X_FBCPS = double(model.X);
-
-            RSElist(4,1) = perfscore(X_FBCPS, X);
-            RSElist(4,2) = perfscore(X_FBCPS(O==1), X(O==1));
-            RSElist(4,3) = perfscore(X_FBCPS(O==0), X(O==0));
-
-            X_FBCPS(O==1) = X(O==1);
-            err = X_FBCPS(:) - X(:);
-            RMSElist(4) = sqrt(mean(err.^2));
-            RRSElist(4) = sqrt(sum(err.^2)/sum(X(:).^2));
-
-            %illigal
-            RankEst(iter,2) = RRSElist(4);
-
-            RankEst(iter,4) = model.TrueRank;
-            TimeCost(4) = toc(tStart);
-
-
-            if length(model.gammas) < 3
-                model.gammas=model.gammas';
-                model.gammas(3)=max(model.gammas);
-                plot_list{iter,2}=sort(model.gammas,'descend');
-                model.An=model.An';
-                model.An(3)=0;  %max(model.gammas);
-                plot_list_An{iter,2}=sort(model.An,'descend');
-            else
-                plot_list{iter,2}=sort(model.gammas(1:3),'descend')';
-                plot_list_An{iter,2}=sort(model.An(1:3),'descend')';
-            end
-
-            RSE_list_list{iter}=RRSElist;
-
-            %% Visualization of data and results
-            %plotYXS(Y, X_FBCPS);
-            %factorCorr = plotFactor(Z,model.X.U);
-
-            %RankEst
-            %RSElist
-            %RMSElist
-            %RRSElist
-            %TimeCost
-            
-            RankEst(iter,:)
-        
-            if RankEst(iter,1)>RankEst(iter,2) && RankEst(iter,4)==5
-                RankEst(iter,1)
-                RankEst(iter,2)
-                pause
-            end
-
-
-        end
-
-        %{
-
-        plot_list_all=cat(1,plot_list{:});
-        figure;
-        plot3(plot_list_all(1:total_plot,1),plot_list_all(1:total_plot,2),plot_list_all(1:total_plot,3),'o')
-        hold on
-        plot3(plot_list_all(total_plot+1:2*total_plot,1),plot_list_all(total_plot+1:2*total_plot,2),plot_list_all(total_plot+1:2*total_plot,3),'+')
-        legend('ARD','ARD-MGP')
-        xlabel('lambda_1')
-        ylabel('lambda_2')
-        zlabel('lambda_3')
-        grid on
-
-        plot_list_all_An=cat(1,plot_list_An{:});
-        figure;
-        plot3(answer(1),answer(2),answer(3),'*')
-        hold on
-        plot3(plot_list_all_An(1:total_plot,1),plot_list_all_An(1:total_plot,2),plot_list_all_An(1:total_plot,3),'o')
-        hold on
-        plot3(plot_list_all_An(total_plot+1:2*total_plot,1),plot_list_all_An(total_plot+1:2*total_plot,2),plot_list_all_An(total_plot+1:2*total_plot,3),'+')
-        legend('True','ARD','ARD-MGP')
-        xlabel('lambda_1')
-        ylabel('lambda_2')
-        zlabel('lambda_3')
-        grid on
-
-        %}
-
-        list_1=zeros(total_plot,1);
-        list_2=zeros(total_plot,1);
-
-        for i=1:total_plot
-        temp=RSE_list_list{i};
-        list_1(i)=temp(3);
-        list_2(i)=temp(4);
-        end
-
-        total_list{rate_iter}=RankEst;
-        total_list_ave{rate_iter}=[mean(list_1),mean(list_2)];
-        
-        rate_iter=rate_iter+1;
+Z = cell(length(DIM),1);   
+if DataType ==1
+    for m=1:length(DIM)
+          Z{m} =  gaussSample(zeros(R,1), eye(R), DIM(m));  
     end
-    
-    str=string(a_del0);
-    str2=string(obs_rate);
-    
-    csvwrite('my'+str2+'File'+str+'.csv',[RankEst(:,2) RankEst(:,4)]);
-    
 end
+if DataType == 2
+    for m=1:length(DIM)
+        temp = linspace(0, m*2*pi, DIM(m));
+        part1 = [sin(temp); cos(temp); square(linspace(0, 16*pi, DIM(m)))]';
+        part2 = gaussSample(zeros(DIM(m),1), eye(DIM(m)), R-size(part1,2))';
+        Z{m} = [part1 part2];
+        Z{m} = Z{m}(:,1:R);
+        Z{m} = zscore(Z{m});
+    end
+end
+
+% Generate tensor by factor matrices
+X = double(ktensor_next(Z,DIM));
+
+%% Random missing values
+ObsRatio = 0.2;               % Observation rate: [0 ~ 1]
+Omega = randperm(prod(DIM)); 
+Omega = Omega(1:round(ObsRatio*prod(DIM)));
+O = zeros(DIM); 
+O(Omega) = 1;
+
+%% Add noise
+SNR = 10;                     % Noise levels
+sigma2 = var(X(:))*(1/(10^(SNR/10)));
+GN = sqrt(sigma2)*randn(DIM);
+
+%% Generate observation tensor Y
+Y = X; %+ GN;
+Y = O.*Y;
+
+%% Run BayesCP
+fprintf('------Bayesian CP Factorization---------- \n');
+
+
+% Initialization
+TimeCost = zeros(4,1);
+RSElist = zeros(4,3);
+RMSElist = zeros(4,1);
+RRSElist = zeros(4,1);
+RankEst = zeros(4,1);
+nd=1;
+
+params.R = 20;
+
+%{
+
+%% MGP-t for natural images
+tStart = tic;
+params.a = 2;
+params.binary = 0;
+params.tau_eps = 1;
+params.normalize = 1;
+params.maxiters = 100;
+params.burnin = 80;
+[data_train data_test subs_train subs_test] = generator_data(X,Y);
+[U lambda prob_avg recover] = mu_mgpcp_gibbs_cp_t(double(data_train),subs_train,double(data_test),subs_test,params);
+X_FBCPS = double(recover);
+
+RSElist(1,1) = perfscore(X_FBCPS, X);
+RSElist(1,2) = perfscore(X_FBCPS(O==1), X(O==1));
+RSElist(1,3) = perfscore(X_FBCPS(O==0), X(O==0));
+
+X_FBCPS(O==1) = X(O==1);
+err = X_FBCPS(:) - X(:);
+RMSElist(1) = sqrt(mean(err.^2));
+RRSElist(1) = sqrt(sum(err.^2)/sum(X(:).^2));
+RankEst(1) = params.R;
+TimeCost(1) = toc(tStart);
+
+%% Visualization of data and results
+plotYXS(Y, X_FBCPS);
+%factorCorr = plotFactor(Z,model.X.U);
+
+
+%% MGP-a for natural images
+tStart = tic;
+params.R = 1;
+[U lambda prob_avg recover R] = mu_mgpcp_gibbs_cp_a(double(data_train),subs_train,double(data_test),subs_test,params);
+X_FBCPS = double(recover);
+
+RSElist(2,1) = perfscore(X_FBCPS, X);
+RSElist(2,2) = perfscore(X_FBCPS(O==1), X(O==1));
+RSElist(2,3) = perfscore(X_FBCPS(O==0), X(O==0));
+
+X_FBCPS(O==1) = X(O==1);
+err = X_FBCPS(:) - X(:);
+RMSElist(2) = sqrt(mean(err.^2));
+RRSElist(2) = sqrt(sum(err.^2)/sum(X(:).^2));
+RankEst(2) = params.R;
+TimeCost(2) = toc(tStart);
+
+%% Visualization of data and results
+plotYXS(Y, X_FBCPS);
+%factorCorr = plotFactor(Z,model.X.U);
+
+
+%}
+
+%% ARD-BCPF-MP (mixture priors) for natural images
+tStart = tic;
+fprintf('------Bayesian CP with Mixture Priors for Image Completion---------- \n');
+[model] = BCPF_TC(Y, 'obs', O, 'init', 'ml', 'maxRank', 2*R, 'dimRed', 1, 'tol', 1e-4, 'maxiters', 60, 'verbose', 2);
+%max([DIM 2*R])
+X_FBCPS = double(model.X);
+
+RSElist(3,1) = perfscore(X_FBCPS, X);
+RSElist(3,2) = perfscore(X_FBCPS(O==1), X(O==1));
+RSElist(3,3) = perfscore(X_FBCPS(O==0), X(O==0));
+
+X_FBCPS(O==1) = X(O==1);
+err = X_FBCPS(:) - X(:);
+RMSElist(3) = sqrt(mean(err.^2));
+RRSElist(3) = sqrt(sum(err.^2)/sum(X(:).^2));
+RankEst(3) = model.TrueRank;
+TimeCost(3) = toc(tStart);
+
+%% Visualization of data and results
+plotYXS(Y, X_FBCPS);
+%factorCorr = plotFactor(Z,model.X.U);
+
+
+%% MGP-ARD-BCPF-TC
+tStart = tic;
+fprintf('------Bayesian CP with Mixture Priors for Image Completion---------- \n');
+[model] = MGP_BCPF_TC(Y, 'obs', O, 'init', 'ml', 'maxRank', 2*R, 'dimRed', 1, 'tol', 1e-4, 'maxiters', 60, 'verbose', 2);
+%1e-4
+
+%max([DIM 2*R])
+X_FBCPS = double(model.X);
+
+RSElist(4,1) = perfscore(X_FBCPS, X);
+RSElist(4,2) = perfscore(X_FBCPS(O==1), X(O==1));
+RSElist(4,3) = perfscore(X_FBCPS(O==0), X(O==0));
+
+X_FBCPS(O==1) = X(O==1);
+err = X_FBCPS(:) - X(:);
+RMSElist(4) = sqrt(mean(err.^2));
+RRSElist(4) = sqrt(sum(err.^2)/sum(X(:).^2));
+RankEst(4) = model.TrueRank;
+TimeCost(4) = toc(tStart);
+
+%% Visualization of data and results
+plotYXS(Y, X_FBCPS);
+%factorCorr = plotFactor(Z,model.X.U);
+
+RankEst
+RSElist
+RMSElist
+RRSElist
+TimeCost
+
