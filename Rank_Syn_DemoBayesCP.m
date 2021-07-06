@@ -1,5 +1,5 @@
 % A demo of Bayesian CP Factorization on synthetic data
-% Written by  Qibin Zhao 2013 RIKEN BSI
+% Written by Hiromu Takayama
 %
 % In this demo, we provide two Bayesian CP Factorization algorithms: one for
 % incomplete tensor and tensor completion ("BCPF_TC.m") and the other one for
