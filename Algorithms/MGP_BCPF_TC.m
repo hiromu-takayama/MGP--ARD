@@ -1,4 +1,4 @@
-function [model] = MGP_BCPF_TC(Y, a_del0,varargin)
+function [model] = MGP_BCPF_TC(Y, varargin)
 % Bayesian CP Factorization using Gaussian Mixture Priors for Image Completion
 %
 % -----------------------------------------------------------------------
@@ -85,7 +85,10 @@ verbose  = ip.Results.verbose;
 DIMRED   = ip.Results.dimRed;
 noise = ip.Results.noise;
 predVar = ip.Results.predVar;
-nd = ip.Results.nd;
+nd = ip.Results.nd
+
+%Hyper Parametaer
+a_del0=0.52;
 
 %% Initialization
 Y = tensor(Y.*O);
