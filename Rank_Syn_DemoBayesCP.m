@@ -21,7 +21,7 @@ close all;
 randn('state',1); rand('state',1); %#ok<RAND>
 %% Generate a low-rank tensor
 DIM = [256,256,3];     % Dimensions of data
-R = 40;                % True CP rank
+R = 3;                % True CP rank
 DataType = 2;         % 1: Random factors   2: The deterministic factors (sin, cos, square)
 
 Z = cell(length(DIM),1);   
@@ -57,7 +57,7 @@ sigma2 = var(X(:))*(1/(10^(SNR/10)));
 GN = sqrt(sigma2)*randn(DIM);
 
 %% Generate observation tensor Y
-Y = X; %+ GN;
+Y = X + GN;
 Y = O.*Y;
 
 %% Run BayesCP
